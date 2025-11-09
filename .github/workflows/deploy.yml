@@ -13,7 +13,6 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -22,13 +21,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
+          # ← cache指定は削除（lockファイルが無くてもOKにする）
 
-      # 🔧 lock が無くても動くように npm install を使用
       - name: Install deps
         run: npm install --no-fund --no-audit
 
-      - name: Build (includes SPA 404 copy via package.json script)
+      - name: Build (SPA 404対策は package.json の build に含める)
         run: npm run build
 
       - name: Upload artifact
