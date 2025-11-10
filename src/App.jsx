@@ -99,11 +99,13 @@ const plDashboardData = {
     { name: '10月', sales: 12500000, profit: 3800000 },
   ],
   costBreakdown: [ // 費用内訳
-    { name: '仕入高', total: 4500000, color: 'bg-cyan-500' },
-    { name: '人件費', total: 2000000, color: 'bg-indigo-500' }, // 給与ソフト連携想定
-    { name: '広告宣伝費', total: 800000, color: 'bg-blue-500' },
-    { name: '消耗品費', total: 450000, color: 'bg-sky-500' },
-    { name: 'その他販管費', total: 950000, color: 'bg-slate-400' },
+    /* ===== 修正: Tailwindクラス (bg-*) から Hexコード (colorHex) に変更 ===== */
+    /* (Tailwindの動的クラス名 'fill-*' が 'npm run dev' でパージされてしまう問題の対策) */
+    { name: '仕入高', total: 4500000, colorHex: '#06b6d4' }, // bg-cyan-500
+    { name: '人件費', total: 2000000, colorHex: '#6366f1' }, // bg-indigo-500
+    { name: '広告宣伝費', total: 800000, colorHex: '#3b82f6' }, // bg-blue-500
+    { name: '消耗品費', total: 450000, colorHex: '#0ea5e9' }, // bg-sky-500
+    { name: 'その他販管費', total: 950000, colorHex: '#94a3b8' }, // bg-slate-400
   ]
 };
 const maxSalesTrend = Math.max(...plDashboardData.monthlyTrend.map(d => d.sales));
@@ -158,7 +160,8 @@ const PieChartSVG = ({ data, total }) => {
   return (
     <svg viewBox="0 0 100 100" className="w-full h-full">
       {segments.map((d, i) => (
-        <path key={i} d={d} className={data[i].color.replace('bg-', 'fill-')} />
+        /* ===== 修正: className (fill-*) からインラインstyle (fill) に変更 ===== */
+        <path key={i} d={d} style={{ fill: data[i].colorHex }} />
       ))}
     </svg>
   );
@@ -1113,7 +1116,8 @@ export default function App() {
                            <div key={d.name} className="flex items-center justify-between text-sm">
                              <div className="flex items-center gap-2">
                                {/* ===== 修正: rounded-full を追加 ===== */}
-                               <div className={`w-3 h-3 ${d.color} rounded-full`} />
+                               {/* ===== 修正: className (bg-*) からインラインstyle (backgroundColor) に変更 ===== */}
+                               <div className={`w-3 h-3 rounded-full`} style={{ backgroundColor: d.colorHex }} />
                                <span className="font-medium">{d.name}</span>
                              </div>
                              <span className="font-medium text-slate-600">{formatYen(d.total)}</span>
