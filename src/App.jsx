@@ -578,7 +578,8 @@ export default function App() {
 
                       {/* ===== 修正: 「請求書発行（販売側）」の場合のみファイルアップロード ===== */}
                       {/* ===== 修正: 「請求書発行」に変更 ===== */}
-                      {(selectedType === '請求書発行' || selectedType === '経費精算' || selectedType === '出張旅費精算') && (
+                      {/* ===== 修正: 「仕入請求書」「稟議・購買」も手動アップロード（ステップ2）の対象にする ===== */}
+                      {(selectedType === '請求書発行' || selectedType === '経費精算' || selectedType === '出張旅費精算' || selectedType === '仕入請求書' || selectedType === '稟議・購買') && (
                         // ===== 修正: Cardコンポーネント側で shadow, rounded 対応 =====
                         <Card>
                           <CardHeader className="p-6 pb-2"><StepTitle step={2} title="ファイルアップロード & AI解析" desc="領収書や請求書をドラッグ＆ドロップ。手動選択も可能です。" /></CardHeader>
@@ -683,11 +684,13 @@ export default function App() {
                       {/* 最終：AI転記の汎用フォーム（請求書発行・経費精算のみ表示） */}
                       {/* ===== 修正: 「請求書」 -> 「請求書発行（販売側）」 ===== */}
                       {/* ===== 修正: 「請求書発行」に変更 ===== */}
-                      {(selectedType === '請求書発行' || selectedType === '経費精算') && (
+                      {/* ===== 修正: 「仕入請求書」以外の場合に汎用フォーム（ステップ3）を表示するよう修正 ===== */}
+                      {(selectedType !== '仕入請求書') && (
                         // ===== 修正: Cardコンポーネント側で shadow, rounded 対応 =====
                         <Card>
                           {/* ===== 修正: Step 2 -> 3 に変更（発行側はファイルアップがStep 2のため） ===== */}
-                          <CardHeader className="p-6 pb-2"><StepTitle step={3} title="AI転記結果の確認・修正" desc="AIが抽出した内容を確認し、必要に応じて修正してください。" /></CardHeader>
+                          {/* ===== 修正: ステップ番号を動的に変更（アップロードがない業務はStep 2） ===== */}
+                          <CardHeader className="p-6 pb-2"><StepTitle step={(selectedType === '請求書発行' || selectedType === '経費精算' || selectedType === '出張旅費精算' || selectedType === '稟議・購買') ? 3 : 2} title="AI転記結果の確認・修正" desc="AIが抽出した内容を確認し、必要に応じて修正してください。" /></CardHeader>
                           <CardContent className="p-6 pt-2 space-y-3">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                               {/* ===== 修正: (Input側で対応) ===== */}
@@ -698,6 +701,12 @@ export default function App() {
                                 {/* ===== 修正: 「請求書発行」に変更 ===== */}
                                 {selectedType === '請求書発行' && <option>売上高</option>}
                                 {selectedType === '経費精算' && <option>消耗品費</option>}
+                                {/* ===== 追加: 他の業務の選択肢（ダミー） ===== */}
+                                {selectedType === '稟議・購買' && <option>仕入高</option>}
+                                {selectedType === '稟議・購買' && <option>消耗品費</option>}
+                                {selectedType === '出張申請' && <option>旅費交通費</option>}
+                                {selectedType === '出張旅費精算' && <option>旅費交通費</option>}
+                                {selectedType === '交通費精算' && <option>旅費交通費</option>}
                               </select>
                             </div>
                             {/* ===== 修正: w-full をコンポーネント定義側に移動 ===== */}
