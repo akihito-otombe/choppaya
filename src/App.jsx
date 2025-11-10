@@ -206,7 +206,8 @@ const CostMonthlyBar = ({ name, total, max }) => (
     <div className="w-full h-40 bg-slate-100 flex items-end rounded-t-md overflow-hidden">
       <div
         style={{ height: `${(total / max) * 100}%` }}
-        className="w-full bg-gradient-to-t from-cyan-600 to-indigo-600"
+        /* ===== 修正: グラデーションを 600 -> 500 に変更 (黒潰れ対策) ===== */
+        className="w-full bg-gradient-to-t from-cyan-500 to-indigo-500"
       />
     </div>
     <div className="text-xs font-medium text-slate-600">{name}</div>
