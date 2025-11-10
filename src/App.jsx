@@ -264,13 +264,13 @@ export default function App() {
   // ===== 修正: 「請求書」を「発行（販売）」「受領（仕入）」に分離 =====
   // ===== 修正: 「(仕入側)」「(販売側)」を削除 =====
   // ===== 修正: 「請求書発行」を左側に移動 =====
-  const applicationTypes = ['請求書発行', '仕入請求書', '経費精算', '交通費精算', '稟議・購買', '出張申請', '出張旅費精算'];
+  // ===== 修正: 「仕入請求書」を左側に移動 =====
+  const applicationTypes = ['仕入請求書', '請求書発行', '経費精算', '交通費精算', '稟議・購買', '出張申請', '出張旅費精算'];
 
   // ===== 申請者 state =====
   // ===== 修正: selectedType のデフォルトを「受領」に変更 =====
   // ===== 修正: デフォルトを「仕入請求書」に変更 =====
-  // ===== 修正: デフォルトを「請求書発行」に変更 =====
-  const [selectedType, setSelectedType] = useState('請求書発行');
+  const [selectedType, setSelectedType] = useState('仕入請求書');
   const [appHistQuery, setAppHistQuery] = useState('');
   const [appHistKind, setAppHistKind] = useState('すべて');
 
@@ -449,7 +449,11 @@ export default function App() {
       <Tabs defaultValue="applicant">
         {/* 役割タブ（タイトルの上） */}
         {/* ===== 修正: ヘッダーの背景を bg-blue-600 に変更 ===== */}
-        <div className="sticky top-0 z-30 bg-blue-600 text-white shadow-md">
+        {/* ===== 修正: ユーザー要望に基づき、背景にグラデーションを適用 (bg-gradient-to-r from-blue-600 to-blue-800) ===== */}
+        {/* ===== 修正: 親要素の text-white を削除（競合回避） ===== */}
+        {/* ===== 修正: グラデーションをより強く、濃い色に変更 (700 -> 900) ===== */}
+        {/* ===== 修正: さらに濃い色に変更 (800 -> 950) ===== */}
+        <div className="sticky top-0 z-30 bg-gradient-to-r from-blue-800 to-blue-950 shadow-md">
           {/* ===== 修正: pt-3 (上の余白) を削除し、px-6 のみ残す ===== */}
           <div className="max-w-6xl mx-auto px-6">
             
@@ -462,7 +466,9 @@ export default function App() {
               className="flex items-center justify-between py-1"
             >
               {/* ===== 修正: h1の背景色(bg-blue-600)を削除（親要素で指定） ===== */}
-              <h1 className="text-xl font-bold">
+              {/* ===== 修正: グラデーションを削除し、シンプルな白文字に変更 ===== */}
+              {/* ===== 修正: text-white を明示的に指定 ===== */}
+              <h1 className="text-xl font-bold text-white">
                 チョッパヤ for BackOffice
               </h1>
               <TabsList className="flex flex-wrap justify-center gap-2">
@@ -529,10 +535,14 @@ export default function App() {
                       {/* ===== 修正: Cardコンポーネント側で shadow, rounded 対応 ===== */}
                       <Card>
                         {/* ===== 修正: step={"💬"} -> step={"1"} ===== */}
-                        <CardHeader><StepTitle step={"1"} title="チャットで申請（自然言語）" desc="請求書を添付し「仕入先Aに支払い」と入力するだけでAIが解析します。" /></CardHeader>
+                        {/* ===== 修正: desc をより汎用的な内容に変更 ===== */}
+                        {/* ===== 修正: desc をさらに抽象化し、「なんでもできる」ことを示唆する内容に変更 ===== */}
+                        {/* ===== 修正: 「自然言語」という言葉をやめ、より平易な表現に変更 ===== */}
+                        <CardHeader><StepTitle step={"1"} title="チャットで申請（AI解析）" desc="普段使っている言葉で申請内容を入力してください。AIが『経費申請』『請求書処理』『稟議』などを自動で判断します。" /></CardHeader>
                         <CardContent className="space-y-3">
                           {/* ===== 修正: w-full を削除 (Textarea側で対応) ===== */}
-                          <Textarea placeholder="例：仕入先A 10月分 請求書（ファイルを添付）" rows={3} />
+                          {/* ===== 修正: プレースホルダーも汎用的なものに変更。rows=4に変更 ===== */}
+                          <Textarea placeholder="例：昨日のタクシー代 4,500円を経費申請（領収書を添付）&#10;例：仕入先A 10月分 請求書（ファイルを添付）&#10;例：〇〇サーバーの購入稟議" rows={4} />
                           <div className="flex justify-between items-center">
                             {/* ===== 修正: rounded-md を適用 (Button側) ===== */}
                             <Button variant="outline" className="h-10"><FileUp size={16}/> ファイルを添付</Button>
