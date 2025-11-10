@@ -1,7 +1,7 @@
 import React, { useState, useContext, createContext, forwardRef } from 'react';
 import { motion } from 'framer-motion';
 // MessageSquare と LineChart をインポート
-import { FileUp, Upload, Send, CheckCircle, XCircle, Search, Download, MessageSquare, LineChart, TrendingUp, Users, PieChart, DollarSign, AlertTriangle } from 'lucide-react';
+import { FileUp, Upload, Send, CheckCircle, XCircle, Search, Download, MessageSquare, LineChart, TrendingUp, Users, PieChart, DollarSign, AlertTriangle, Check } from 'lucide-react';
 
 // --- shadcn/uiの簡易的な代替コンポーネント ---
 // ===== 修正: rounded-lg と shadow-sm を復活させ、メリハリをつける =====
@@ -261,12 +261,28 @@ export default function App() {
   );
 
   // ===== 申請者の業務カテゴリを分離 =====
-  const applicationTypes = ['請求書', '経費精算', '交通費精算', '稟議・購買', '出張申請', '出張旅費精算'];
+  // ===== 修正: 「請求書」を「発行（販売）」「受領（仕入）」に分離 =====
+  // ===== 修正: 「(仕入側)」「(販売側)」を削除 =====
+  // ===== 修正: 「請求書発行」を左側に移動 =====
+  const applicationTypes = ['請求書発行', '仕入請求書', '経費精算', '交通費精算', '稟議・購買', '出張申請', '出張旅費精算'];
 
   // ===== 申請者 state =====
-  const [selectedType, setSelectedType] = useState('請求書');
+  // ===== 修正: selectedType のデフォルトを「受領」に変更 =====
+  // ===== 修正: デフォルトを「仕入請求書」に変更 =====
+  // ===== 修正: デフォルトを「請求書発行」に変更 =====
+  const [selectedType, setSelectedType] = useState('請求書発行');
   const [appHistQuery, setAppHistQuery] = useState('');
   const [appHistKind, setAppHistKind] = useState('すべて');
+
+  // ===== 追加: 請求書受領（仕入側）のAI検知リスト state =====
+  const [receivedInvoices, setReceivedInvoices] = useState([
+    { id: 'R-001', vendor: '株式会社メディカルサプライ', amount: 125000, receivedDate: '2025-10-30', aiGuess: '仕入高', status: '検知済' },
+    { id: 'R-002', vendor: '○○ビル管理会社', amount: 78000, receivedDate: '2025-10-28', aiGuess: '地代家賃 (定常)', status: 'スキップ済 (自動登録)' },
+    { id: 'R-003', vendor: '△△広告代理店', amount: 350000, receivedDate: '2025-10-29', aiGuess: '広告宣伝費 (変動)', status: '確認中' },
+    { id: 'R-004', vendor: '不明な送信元 (添付あり)', amount: null, receivedDate: '2025-10-30', aiGuess: '要確認', status: '検知済' },
+  ]);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState(null);
+  const selectedInvoice = receivedInvoices.find(inv => inv.id === selectedInvoiceId);
 
   // === 交通費ウィザード（単票 & 月末まとめ） ===
   const [routeFrom, setRouteFrom] = useState('新宿');
@@ -297,24 +313,38 @@ export default function App() {
 
   // ===== 承認者 state =====
   const approverHistoryData = [
-    { id: 'A-201', type: '請求書', title: '仕入先A 9月分 請求書', amount: 254000, action: '承認', date: '2025-10-05' },
+    { id: 'A-201', type: '支払承認（仕入）', title: '仕入先A 9月分 請求書', amount: 254000, action: '承認', date: '2025-10-05' },
     { id: 'A-202', type: '交通費精算', title: '営業交通費（9/28〜10/2）', amount: 12840, action: '差戻', date: '2025-10-15' },
   ];
   const applicantHistoryData = [
-    { id: 'H-101', type: '請求書', title: '仕入先A 9月分 請求書', amount: 254000, status: '承認→登録済', date: '2025-10-05' },
+    // ===== 修正: typeを「支払承認（仕入）」 -> 「仕入請求書」に変更 =====
+    { id: 'H-101', type: '仕入請求書', title: '仕入先A 9月分 請求書', amount: 254000, status: '承認→登録済', date: '2025-10-05' },
     { id: 'H-102', type: '交通費精算', title: '出張交通費（9/12）', amount: 8420, status: '差戻→再申請中', date: '2025-10-15' },
     { id: 'H-103', type: '経費精算', title: '文具購入', amount: 2980, status: '承認→登録済', date: '2025-10-22' },
   ];
 
   const [requests, setRequests] = useState([
     {
-      id: 'REQ-24001', type: '請求書', title: '仕入先A 10月分 請求書', vendor: '仕入先A株式会社', amount: 286000, currency: 'JPY',
-      whoName: '田中 太郎', whoDept: '経理部', what: '部材費の支払い（発注#PO-1024 ／ 10月納品分）', when: '2025-10-31', whereTo: '経理部長 佐藤 宛', why: '月次契約に基づく支払', how: '銀行振込（翌月末）',
-      attachments: [ { name: 'invoice_a_oct.pdf', kind: 'pdf' } ], risk: '低', confidence: 0.92, status: '待ち',
-      checklist: [ { k: '発注情報(PO-1024)との一致', ok: true }, { k: '金額・税区分の妥当性', ok: true }, { k: '支払先口座の変更有無', ok: true } ],
+      // ===== 修正: 「請求書」 -> 「支払承認（仕入）」、内容を「変動仕入」に調整 =====
+      id: 'REQ-24001', type: '支払承認（仕入）', title: '仕入先A 10月分 請求書（変動）', vendor: '仕入先A株式会社', amount: 286000, currency: 'JPY',
+      whoName: 'AI-BPO (検知)', whoDept: '経理部', what: '部材費の支払い（発注#PO-1024 ／ 10月納品分）', when: '2025-10-31', whereTo: '経理部長 佐藤 宛', why: '月次契約に基づく支払 (変動あり)', how: '銀行振込（翌月末）',
+      attachments: [ { name: 'invoice_a_oct.pdf', kind: 'pdf' } ], 
+      // ===== 修正: riskとconfidenceを調整 =====
+      risk: '中 (変動)', confidence: 0.85, status: '待ち',
+      checklist: [ { k: '発注情報(PO-1024)との一致', ok: true }, { k: '金額・税区分の妥当性', ok: true }, { k: '支払先口座の変更有無', ok: true }, { k: '過去の同月比 (変動 +15%)', ok: false } ],
       // ===== 修正: 申請日とアラートフラグを追加 =====
       receivedDate: '2025-10-28', 
       isUrgent: true,
+    },
+    {
+      // ===== 追加: 定常仕入（家賃）のダミーデータ。AIが自動承認候補とする =====
+      id: 'REQ-24004', type: '支払承認（仕入）', title: 'ビル管理費 10月分（定常）', vendor: '○○ビル管理', amount: 78000, currency: 'JPY',
+      whoName: 'AI-BPO (検知)', whoDept: '管理部', what: '事務所家賃（10月分）', when: '2025-10-31', whereTo: '管理部長 井上 宛', why: '月次賃貸契約', how: '銀行振込（翌月末）',
+      attachments: [ { name: 'invoice_rent_oct.pdf', kind: 'pdf' } ], 
+      risk: '低 (定常)', confidence: 0.99, status: '待ち',
+      checklist: [ { k: '過去の支払パターンと完全一致', ok: true }, { k: '金額・税区分の妥当性', ok: true }, { k: '支払先口座の変更有無', ok: true } ],
+      receivedDate: '2025-10-28', 
+      isUrgent: false,
     },
     {
       id: 'REQ-24002', type: '交通費精算', title: '営業交通費（9/28〜10/2）', vendor: '—', amount: 12840, currency: 'JPY',
@@ -348,6 +378,7 @@ export default function App() {
 
   const [apprHistQuery, setApprHistQuery] = useState('');
   const [apprHistKind, setApprHistKind] = useState('すべて');
+  // ===== エラー修正: `appQuery` -> `appHistQuery` に修正 =====
   const filteredAppHist = applicantHistoryData.filter(r => (appHistKind === 'すべて' || r.type === appHistKind) && (appHistQuery === '' || r.title.includes(appHistQuery)));
   const filteredApprHist = approverHistoryData.filter(r => (apprHistKind === 'すべて' || r.type === apprHistKind) && (apprHistQuery === '' || r.title.includes(apprHistQuery)));
 
@@ -545,7 +576,9 @@ export default function App() {
                         </CardContent>
                       </Card>
 
-                      {(selectedType === '請求書' || selectedType === '経費精算' || selectedType === '出張旅費精算') && (
+                      {/* ===== 修正: 「請求書発行（販売側）」の場合のみファイルアップロード ===== */}
+                      {/* ===== 修正: 「請求書発行」に変更 ===== */}
+                      {(selectedType === '請求書発行' || selectedType === '経費精算' || selectedType === '出張旅費精算') && (
                         // ===== 修正: Cardコンポーネント側で shadow, rounded 対応 =====
                         <Card>
                           <CardHeader className="p-6 pb-2"><StepTitle step={2} title="ファイルアップロード & AI解析" desc="領収書や請求書をドラッグ＆ドロップ。手動選択も可能です。" /></CardHeader>
@@ -562,155 +595,98 @@ export default function App() {
                         </Card>
                       )}
 
-                      {/* === 交通費精算（ウィザードのみ） === */}
-                      {selectedType === '交通費精算' && (
-                        // ===== 修正: Cardコンポーネント側で shadow, rounded 対応 =====
-                        <Card>
-                          <CardHeader className="p-6 pb-2">
-                            <StepTitle step={2} title="交通費ウィザード" desc="IC明細の取り込み、経路試算、定期区間控除をまとめて行います。" />
-                          </CardHeader>
-                          <CardContent className="p-6 pt-2 space-y-5">
-                            <Tabs defaultValue="single">
-                              <div className="flex items-center justify-between border-b pb-2">
-                                <TabsList className="bg-transparent p-0">
-                                  {/* ===== 修正: スタイル変更 (下線タブ・アクセントカラー) ===== */}
-                                  <TabsTrigger value="single" className="text-sm font-medium border-b-2 border-transparent px-3 py-2 text-gray-500 hover:text-blue-700 data-[state=active]:text-blue-600 data-[state=active]:border-blue-600">単票入力</TabsTrigger>
-                                  <TabsTrigger value="batch" className="text-sm font-medium border-b-2 border-transparent px-3 py-2 text-gray-500 hover:text-blue-700 data-[state=active]:text-blue-600 data-[state=active]:border-blue-600 ml-2">まとめ入力</TabsTrigger>
-                                </TabsList>
+                      {/* ===== 追加: 請求書受領（仕入側）のAI検知リスト ===== */}
+                      {/* ===== 修正: 「仕入請求書」に変更 ===== */}
+                      {selectedType === '仕入請求書' && (
+                        <>
+                          <Card>
+                            <CardHeader className="p-6 pb-2">
+                              <StepTitle 
+                                step={2} 
+                                title="AI受領検知リスト（仕入請求書）" 
+                                desc="メールや連携SaaSからAIが自動検知した請求書です。内容を確認してください。" 
+                              />
+                            </CardHeader>
+                            <CardContent className="p-6 pt-2 space-y-2">
+                              <div className="grid grid-cols-5 gap-3 text-xs font-medium text-muted-foreground px-2 py-1">
+                                <div>受領日</div>
+                                <div className="col-span-2">取引先名</div>
+                                <div>金額</div>
+                                <div>状態 / AI推測</div>
                               </div>
-
-                              {/* 単票 */}
-                              <TabsContent value="single" className="space-y-4 pt-4">
-                                <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-center">
-                                  {/* ===== 修正: rounded-md を適用 (Input側) ===== */}
-                                  <Input value={routeFrom} onChange={(e)=>setRouteFrom(e.target.value)} placeholder="出発（例：新宿）" className="h-10 md:col-span-1" />
-                                  <div className="text-center text-sm">→</div>
-                                  <Input value={routeTo} onChange={(e)=>setRouteTo(e.target.value)} placeholder="到着（例：品川）" className="h-10 md:col-span-1" />
-                                  <Input value={routeVia} onChange={(e)=>setRouteVia(e.target.value)} placeholder="経由（任意）" className="h-10 md:col-span-1" />
-                                  <Input value={routeDate} onChange={(e)=>setRouteDate(e.target.value)} placeholder="日付" className="h-10 md:col-span-1" type="date" />
-                                </div>
-                                {/* ===== 修正: (Button側で対応) ===== */}
-                                <Button className="flex items-center gap-2 h-11"><Send size={18}/> この内容で申請</Button>
-                              </TabsContent>
-
-                              {/* まとめ入力 */}
-                              <TabsContent value="batch" className="space-y-3 pt-4">
-                                <div className="flex items-center justify-between">
-                                  <div className="text-sm text-muted-foreground">当月の交通費を表形式でまとめて入力・申請できます。</div>
-                                  <div className="flex gap-2">
-                                    {/* ===== 修正: (Button側で対応) ===== */}
-                                    <Button variant="outline" className="h-9" onClick={()=>setTransportRows([...transportRows, {date:'',from:'',to:'',via:'',fare:0,after:0,note:''}])}>行を追加</Button>
-                                    <Button variant="outline" className="h-9" onClick={()=>setTransportRows([])}>クリア</Button>
+                              {receivedInvoices.map(inv => (
+                                <button 
+                                  key={inv.id} 
+                                  onClick={() => setSelectedInvoiceId(inv.id)}
+                                  className={`w-full text-left grid grid-cols-5 gap-3 border p-3 rounded-lg transition ${selectedInvoiceId === inv.id ? 'bg-blue-50 border-blue-400 ring-1 ring-blue-300' : 'hover:bg-gray-100'}`}
+                                >
+                                  <div className="text-sm">{inv.receivedDate}</div>
+                                  <div className="text-sm font-medium col-span-2 truncate">{inv.vendor}</div>
+                                  <div className="text-sm">{inv.amount ? inv.amount.toLocaleString() + '円' : <span className="text-gray-400">N/A</span>}</div>
+                                  <div className="text-xs">
+                                    {inv.status === 'スキップ済 (自動登録)' ? (
+                                      <span className="flex items-center gap-1 px-2 py-0.5 bg-green-100 text-green-800 rounded-full">
+                                        <Check size={14}/> {inv.status}
+                                      </span>
+                                    ) : (
+                                      <span className={`px-2 py-0.5 rounded-full ${inv.status === '確認中' ? 'bg-yellow-100 text-yellow-800' : 'bg-slate-200 text-slate-700'}`}>
+                                        {inv.status}
+                                      </span>
+                                    )}
+                                    <div className="mt-1 text-slate-500 truncate">AI: {inv.aiGuess}</div>
                                   </div>
+                                </button>
+                              ))}
+                              <div className="flex justify-end gap-2 pt-2">
+                                <Button variant="outline" className="h-10">AI検知リストを更新</Button>
+                                <Button className="h-10 bg-green-600 hover:bg-green-700">
+                                  <CheckCircle size={16}/> {receivedInvoices.filter(i => i.status === '確認中').length}件を仕訳登録へ
+                                </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                          
+                          {/* 選択した請求書の確認・修正フォーム */}
+                          {selectedInvoice && (
+                            <Card>
+                              <CardHeader className="p-6 pb-2">
+                                <StepTitle 
+                                  step={3} 
+                                  title={`[${selectedInvoice.vendor}] の確認・修正`}
+                                  desc="AIが抽出した内容を確認し、必要に応じて修正してください。" 
+                                />
+                              </CardHeader>
+                              <CardContent className="p-6 pt-2 space-y-3">
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                                  <Input placeholder="金額（AI）" value={selectedInvoice.amount || ''} className="h-11" />
+                                  <Input placeholder="日付（AI）" value={selectedInvoice.receivedDate || ''} className="h-11" />
+                                  <select className="h-11 border px-3 text-sm bg-white border-gray-300 rounded-md">
+                                    <option>{selectedInvoice.aiGuess}（AI推奨）</option>
+                                    <option>仕入高</option>
+                                    <option>地代家賃</option>
+                                    <option>広告宣伝費</option>
+                                    <option>消耗品費</option>
+                                  </select>
                                 </div>
-                                {/* ===== 修正: rounded-lg を追加 ===== */}
-                                <div className="border overflow-x-auto rounded-lg">
-                                  <div className="grid grid-cols-7 min-w-[700px] bg-slate-100 text-xs font-medium px-3 py-2">
-                                    <div>日付</div><div>出発</div><div>到着</div><div>経由</div><div>運賃</div><div>定期控除後</div><div>メモ</div>
-                                  </div>
-                                  <div className="divide-y min-w-[700px]">
-                                    {transportRows.map((row, i)=> (
-                                      <div key={i} className="grid grid-cols-7 px-3 py-2 gap-2 text-sm">
-                                        <Input value={row.date} onChange={(e)=>updateTransport(i,'date',e.target.value)} className="h-8" placeholder="YYYY-MM-DD"/>
-                                        <Input value={row.from} onChange={(e)=>updateTransport(i,'from',e.target.value)} className="h-8"/>
-                                        <Input value={row.to} onChange={(e)=>updateTransport(i,'to',e.target.value)} className="h-8"/>
-                                        <Input value={row.via} onChange={(e)=>updateTransport(i,'via',e.target.value)} className="h-8"/>
-                                        <Input value={row.fare} onChange={(e)=>updateTransport(i,'fare',Number(e.target.value||0))} className="h-8" type="number" />
-                                        <Input value={row.after} onChange={(e)=>updateTransport(i,'after',Number(e.target.value||0))} className="h-8" type="number" />
-                                        <Input value={row.note} onChange={(e)=>updateTransport(i,'note',e.target.value)} className="h-8"/>
-                                      </div>
-                                    ))}
-                                  </div>
+                                <Textarea placeholder="備考・メモ（例：PO-1025紐付け）" />
+                                <div className="flex items-center gap-3">
+                                  <Button className="flex items-center gap-2 h-11"><Send size={18}/> この内容で仕訳登録</Button>
+                                  <Button variant="destructive" className="flex items-center gap-2 h-11"><XCircle size={18}/> この検知は無視</Button>
                                 </div>
-                                <div className="flex items-center justify-between">
-                                  <div className="text-sm">合計：<span className="font-semibold">{transportRows.reduce((s,r)=>s+(Number(r.after)||0),0).toLocaleString()}円</span></div>
-                                  <div className="flex gap-2">
-                                    {/* ===== 修正: (Button側で対応) ===== */}
-                                    <Button variant="outline" className="h-10" onClick={pasteExampleRows}>サンプルを入れる</Button>
-                                    <Button className="h-10"><Send size={16}/> 選択月のまとめを申請</Button>
-                                  </div>
-                                </div>
-                              </TabsContent>
-                            </Tabs>
-                          </CardContent>
-                        </Card>
+                              </CardContent>
+                            </Card>
+                          )}
+                        </>
                       )}
 
-                      {/* === 稟議・購買（手動入力） === */}
-                      {selectedType === '稟議・購買' && (
+                      {/* === 交通費精算（ウィザードのみ） === */}
+                      {/* 最終：AI転記の汎用フォーム（請求書発行・経費精算のみ表示） */}
+                      {/* ===== 修正: 「請求書」 -> 「請求書発行（販売側）」 ===== */}
+                      {/* ===== 修正: 「請求書発行」に変更 ===== */}
+                      {(selectedType === '請求書発行' || selectedType === '経費精算') && (
                         // ===== 修正: Cardコンポーネント側で shadow, rounded 対応 =====
                         <Card>
-                          <CardHeader className="p-6 pb-2"><StepTitle step={2} title="稟議・購買情報" desc="件名・金額・理由・納品希望日などを入力してください。" /></CardHeader>
-                          <CardContent className="p-6 pt-2 space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {/* ===== 修正: (Input側で対応) ===== */}
-                              <Input placeholder="件名（例：PC購入）" className="h-11" />
-                              <Input placeholder="概算金額" className="h-11" type="number" />
-                              <Input placeholder="取引先候補" className="h-11" />
-                              <Input placeholder="納品希望日" className="h-11" type="date" />
-                            </div>
-                            {/* ===== 修正: (Textarea側で対応) ===== */}
-                            <Textarea placeholder="申請理由・用途など" />
-                            {/* ===== 修正: (Button側で対応) ===== */}
-                            <Button className="flex items-center gap-2 h-11"><Send size={18}/> 稟議を申請</Button>
-                          </CardContent>
-                        </Card>
-                      )}
-                      
-                      {/* === 出張申請（手動入力） === */}
-                      {selectedType === '出張申請' && (
-                        // ===== 修正: Cardコンポーネント側で shadow, rounded 対応 =====
-                        <Card>
-                          <CardHeader className="p-6 pb-2"><StepTitle step={2} title="出張情報" desc="目的・訪問先・日程・概算費用を入力してください。" /></CardHeader>
-                          <CardContent className="p-6 pt-2 space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {/* ===== 修正: (Input側で対応) ===== */}
-                              <Input placeholder="出張目的（例：顧客訪問・展示会）" className="h-11" />
-                              <Input placeholder="訪問先（会社/会場名）" className="h-11" />
-                              <Input placeholder="期間（例：2025/11/10-11/12）" className="h-11" />
-                              <Input placeholder="概算費用（交通・宿泊・日当）" className="h-11" />
-                            </div>
-                            {/* ===== 修正: (Textarea側で対応) ===== */}
-                            <Textarea placeholder="備考（旅程、見積URLなど）" />
-                            <div className="text-xs text-muted-foreground">※ 承認後に旅費IDが発行され、事後精算と紐づきます。</div>
-                            {/* ===== 修正: グラデーション削除 (Button側で対応) ===== */}
-                            <Button className="flex items-center gap-2 h-11"><Send size={18}/> 出張を申請</Button>
-                          </CardContent>
-                        </Card>
-                      )}
-                      
-                      {/* === 出張旅費精算（ファイル＋手動） === */}
-                      {selectedType === '出張旅費精算' && (
-                        // ===== 修正: Cardコンポーネント側で shadow, rounded 対応 =====
-                        <Card>
-                          <CardHeader className="p-6 pb-2"><StepTitle step={3} title="旅費精算" desc="旅費IDを選び、領収書を取り込むとAIが費目分解します。" /></CardHeader>
-                          <CardContent className="p-6 pt-2 space-y-3">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                              {/* ===== 修正: (Input, Button側で対応) ===== */}
-                              <Input placeholder="旅費ID（例：TRIP-2025-010）" className="h-11" />
-                              <Input placeholder="期間（例：2025/11/10-11/12）" className="h-11" />
-                              <Button variant="outline" className="h-11">領収書をまとめて取り込む</Button>
-                            </div>
-                            {/* ===== 修正: rounded-lg を追加 ===== */}
-                            <div className="border p-3 bg-slate-100 text-sm rounded-lg">
-                              <div className="font-medium mb-1">AI抽出（費目分解・ダミー）</div>
-                              <ul className="list-disc pl-5 space-y-1">
-                                <li>交通：12,840円（IC明細2件）</li>
-                                <li>宿泊：9,800円（ホテル領収書）</li>
-                                <li>日当：3,000円（2日）</li>
-                                <li>合計：25,640円</li>
-                              </ul>
-                            </div>
-                            {/* ===== 修正: (Button側で対応) ===== */}
-                            <Button className="flex items-center gap-2 h-11"><Send size={18}/> 旅費を精算申請</Button>
-                          </CardContent>
-                        </Card>
-                      )}
-
-                      {/* 最終：AI転記の汎用フォーム（請求書・経費精算のみ表示） */}
-                      {(selectedType === '請求書' || selectedType === '経費精算') && (
-                        // ===== 修正: Cardコンポーネント側で shadow, rounded 対応 =====
-                        <Card>
+                          {/* ===== 修正: Step 2 -> 3 に変更（発行側はファイルアップがStep 2のため） ===== */}
                           <CardHeader className="p-6 pb-2"><StepTitle step={3} title="AI転記結果の確認・修正" desc="AIが抽出した内容を確認し、必要に応じて修正してください。" /></CardHeader>
                           <CardContent className="p-6 pt-2 space-y-3">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -719,7 +695,8 @@ export default function App() {
                               <Input placeholder="日付（AI）" className="h-11" />
                               <select className="h-11 border px-3 text-sm bg-white border-gray-300 rounded-md">
                                 <option>勘定科目（AI推奨）</option>
-                                {selectedType === '請求書' && <option>仕入高</option>}
+                                {/* ===== 修正: 「請求書発行」に変更 ===== */}
+                                {selectedType === '請求書発行' && <option>売上高</option>}
                                 {selectedType === '経費精算' && <option>消耗品費</option>}
                               </select>
                             </div>
@@ -752,14 +729,30 @@ export default function App() {
                 {/* ===== 修正: pt-5 を追加 ===== */}
                 <TabsContent value="history" className="space-y-4 pt-5">
                   {/* ===== 修正: Cardコンポーネント側で shadow, rounded 対応 ===== */}
+                  {/* ===== エラー修正: 申請履歴(applicant)のCardタグ内が破損していたため修復 ===== */}
                   <Card>
-                    <CardHeader className="p-6 pb-3 flex justify-between items-center"><CardTitle className="text-lg font-semibold">申請履歴</CardTitle><Button variant="outline" onClick={() => exportCSV([
-                    ].concat(filteredAppHist.map(h => [h.id,h.type,h.title,h.amount,h.status,h.date])), 'applicant_history.csv')} className="gap-2 h-10"><Download size={16}/> CSV出力</Button></CardHeader>
+                    <CardHeader className="p-6 pb-3 flex justify-between items-center">
+                      <CardTitle className="text-lg font-semibold">申請履歴</CardTitle>
+                      <Button 
+                        variant="outline" 
+                        onClick={() => exportCSV([
+                          ['ID','種類','件名','金額','状態','日付']
+                        ].concat(filteredAppHist.map(h => [h.id,h.type,h.title,h.amount,h.status,h.date])), 'applicant_history.csv')} 
+                        className="gap-2 h-10">
+                        <Download size={16}/> CSV出力
+                      </Button>
+                    </CardHeader>
                     <CardContent className="p-6 pt-2 space-y-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        {/* ===== 修正: (Input側で対応) ===== */}
+                      <div className="flex items-center gap-2">
                         <div className="relative flex-1 min-w-[200px]"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/><Input value={appHistQuery} onChange={(e)=>setAppHistQuery(e.target.value)} placeholder="件名で検索" className="pl-9 h-10 w-full"/></div>
-                        <select value={appHistKind} onChange={(e)=>setAppHistKind(e.target.value)} className="h-10 border px-3 text-sm bg-white border-gray-300 rounded-md min-w-[130px]"><option>すべて</option><option>請求書</option><option>経費精算</option><option>交通費精算</option><option>稟議・購買</option><option>出張申請</option><option>出張旅費精算</option></select>
+                        <select value={appHistKind} onChange={(e)=>setAppHistKind(e.target.value)} className="h-10 border px-3 text-sm bg-white border-gray-300 rounded-md min-w-[130px]">
+                          <option>すべて</option>
+                          {/* ===== 修正: 履歴フィルタにも「発行」「受領」を反映 ===== */}
+                          {/* ===== 修正: 「(仕入側)」「(販売側)」を削除 ===== */}
+                          <option>仕入請求書</option>
+                          <option>請求書発行</option>
+                          <option>経費精算</option><option>交通費精算</option><option>稟議・購買</option><option>出張申請</option><option>出張旅費精算</option>
+                        </select>
                       </div>
                       <div className="grid grid-cols-5 gap-2 text-xs font-medium text-muted-foreground px-1"><div>ID</div><div>種類</div><div>件名</div><div>金額</div><div>状態/日付</div></div>
                       <div className="mt-1 space-y-2">
@@ -800,18 +793,34 @@ export default function App() {
                             <CardTitle className="text-lg font-semibold">承認待ち一覧</CardTitle>
                             <div className="flex gap-2">
                               {/* ===== 修正: (Button側で対応) ===== */}
-                              <Button size="sm" variant="outline" className="gap-2" onClick={() => exportCSV([
-                                ['ID','種類','件名','金額','状態']
-                              ].concat(filteredInbox.map(r => [r.id,r.type,r.title,r.amount,r.status])), 'approver_inbox.csv')}><Download size={14}/>CSV</Button>
+                              {/* ===== エラー修正: ButtonのonClickが壊れていたのを修正 ===== */}
+                              <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="gap-2" 
+                                onClick={() => exportCSV([
+                                  ['ID','種類','件名','金額','状態']
+                                ].concat(filteredInbox.map(r => [r.id, r.type, r.title, r.amount, r.status])), 'inbox_list.csv')}
+                              >
+                                <Download size={16}/> CSV出力
+                              </Button>
                             </div>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-1">一覧から選択し、内容を確認して承認/却下してください。複数選択して一括承認も可能です。</p>
                         </CardHeader>
                         <CardContent className="p-6 pt-2 space-y-3">
                           <div className="flex items-center gap-2">
                             {/* ===== 修正: (Input側で対応) ===== */}
                             <div className="relative flex-1"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/><Input value={inboxQuery} onChange={(e)=>setInboxQuery(e.target.value)} placeholder="件名で検索" className="pl-9 h-10 w-full"/></div>
-                            <select value={inboxKind} onChange={(e)=>setInboxKind(e.target.value)} className="h-10 border px-3 text-sm bg-white border-gray-300 rounded-md min-w-[130px]"><option>すべて</option><option>請求書</option><option>経費精算</option><option>交通費精SAN</option><option>稟議・購買</option><option>出張申請</option><option>出張旅費精算</option></select>
+                            {/* ===== 修正: フィルタに「支払承認（仕入）」を追加 ===== */}
+                            <select value={inboxKind} onChange={(e)=>setInboxKind(e.target.value)} className="h-10 border px-3 text-sm bg-white border-gray-300 rounded-md min-w-[130px]">
+                              <option>すべて</option>
+                              <option>支払承認（仕入）</option>
+                              <option>経費精算</option>
+                              <option>交通費精算</option>
+                              <option>稟議・購買</option>
+                              <option>出張申請</option>
+                              <option>出張旅費精算</option>
+                            </select>
                           </div>
                           {/* 一括承認バー */}
                           <BulkApproveBar selectedIds={bulkSelected} onApprove={bulkApprove} onReject={bulkReject} />
@@ -855,19 +864,27 @@ export default function App() {
                             <div className="p-3 bg-slate-100 border rounded-lg"><div className="text-[10px] uppercase text-muted-foreground">Why</div><div className="text-sm">{selected.why}</div></div>
                             <div className="p-3 bg-slate-100 border rounded-lg"><div className="text-[10px] uppercase text-muted-foreground">How</div><div className="text-sm">{selected.how}</div></div>
                           </div>
+                          
+                          {/* ===== エラー修正: ここから ===== */}
+                          {/* seleccion.attachments.length のブロックが破損していました */}
                           {selected.attachments.length > 0 && (
                             <div>
-                              <div className="text-xs text-muted-foreground mb-2">添付された証憑をこの場で閲覧できます。</div>
-                              {selected.attachments.map((f, idx) => (<AttachmentPreview key={idx} file={f} />))}
+                              <div className="text-sm font-medium mb-2">添付ファイル</div>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {selected.attachments.map((f, idx) => (<AttachmentPreview key={idx} file={f} />))}
+                              </div>
                             </div>
                           )}
                           <div className="flex flex-wrap items-center gap-2 text-sm">
                             {/* ===== 修正: rounded-full を追加 ===== */}
                             <span className="px-2 py-0.5 text-xs bg-slate-200 rounded-full">金額：{selected.amount.toLocaleString()} {selected.currency}</span>
                             {selected.vendor !== '—' && <span className="px-2 py-0.5 text-xs bg-slate-200 rounded-full">取引先：{selected.vendor}</span>}
-                            <span className={`px-2 py-0.5 text-xs rounded-full ${selected.risk === '低' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-900'}`}>リスク：{selected.risk}</span>
+                            {/* ===== 修正: リスク判定のロジックを微調整 ===== */}
+                            <span className={`px-2 py-0.5 text-xs rounded-full ${selected.risk.includes('低') ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-900'}`}>リスク：{selected.risk}</span>
                             <span className="px-2 py-0.5 text-xs bg-slate-200 rounded-full">AI確度：{Math.round(selected.confidence*100)}%</span>
                           </div>
+                          {/* ===== エラー修正: ここまで ===== */}
+
                         </CardContent>
                       </Card>
 
@@ -879,7 +896,8 @@ export default function App() {
                             // ===== 修正: rounded-lg を追加, rounded-full (タグ) =====
                             <div key={i} className="flex items-center justify-between border p-2 rounded-lg">
                               <span className="text-sm">{c.k}</span>
-                              <span className={`text-xs px-2 py-0.5 rounded-full ${c.ok ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>{c.ok ? 'OK' : '要確認'}</span>
+                              {/* ===== 修正: ok=false の場合（アラート）のスタイルを調整 ===== */}
+                              <span className={`text-xs px-2 py-0.5 rounded-full ${c.ok ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-900 font-semibold'}`}>{c.ok ? 'OK' : '要確認'}</span>
                             </div>
                           ))}
                         </CardContent>
@@ -924,7 +942,16 @@ export default function App() {
                       <div className="flex items-center gap-2">
                         {/* ===== 修正: (Input側で対応) ===== */}
                         <div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"/><Input value={apprHistQuery} onChange={(e)=>setApprHistQuery(e.target.value)} placeholder="件名で検索" className="pl-9 h-10 w-56"/></div>
-                        <select value={apprHistKind} onChange={(e)=>setApprHistKind(e.target.value)} className="h-10 border px-3 text-sm bg-white border-gray-300 rounded-md min-w-[130px]"><option>すべて</option><option>請求書</option><option>経費精算</option><option>交通費精算</option><option>稟議・購買</option><option>出張申請</option><option>出張旅費精算</option></select>
+                        {/* ===== 修正: 履歴フィルタにも「支払承認（仕入）」を追加 ===== */}
+                        <select value={apprHistKind} onChange={(e)=>setApprHistKind(e.target.value)} className="h-10 border px-3 text-sm bg-white border-gray-300 rounded-md min-w-[130px]">
+                          <option>すべて</option>
+                          <option>支払承認（仕入）</option>
+                          <option>経費精算</option>
+                          <option>交通費精算</option>
+                          <option>稟議・購買</option>
+                          <option>出張申請</option>
+                          <option>出張旅費精算</option>
+                        </select>
                       </div>
                       <div className="grid grid-cols-6 gap-2 text-xs font-medium text-muted-foreground px-1"><div>ID</div><div>種類</div><div>件名</div><div>金額</div><div>操作</div><div>日付</div></div>
                       <div className="mt-1 space-y-2">
@@ -1139,3 +1166,5 @@ export default function App() {
     </motion.div>
   );
 }
+
+{/* ===== エラー修正: ファイル末尾の重複した export default function App() { ... を削除 ===== */}
