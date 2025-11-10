@@ -634,50 +634,126 @@ export default function App() {
                                         {inv.status}
                                       </span>
                                     )}
-                                    <div className="mt-1 text-slate-500 truncate">AI: {inv.aiGuess}</div>
+                                    {/* ===== エラー修正: </div> と </button> と )) が欠落していた ===== */}
                                   </div>
                                 </button>
                               ))}
-                              <div className="flex justify-end gap-2 pt-2">
-                                <Button variant="outline" className="h-10">AI検知リストを更新</Button>
-                                <Button className="h-10 bg-green-600 hover:bg-green-700">
-                                  <CheckCircle size={16}/> {receivedInvoices.filter(i => i.status === '確認中').length}件を仕訳登録へ
-                                </Button>
+                            </CardContent>
+                          </Card>
+                        </>
+                      )}
+
+                      {/* ===== 追加: 交通費精算（ウィザード＆まとめ） ===== */}
+                      {selectedType === '交通費精算' && (
+                        <>
+                          {/* 単票（ウィザード） */}
+                          <Card>
+                            <CardHeader className="p-6 pb-2">
+                              <StepTitle 
+                                step={2} 
+                                title="交通費精算（単票入力）" 
+                                desc="経路を入力して運賃を検索・追加します。" 
+                              />
+                            </CardHeader>
+                            <CardContent className="p-6 pt-2 space-y-3">
+                              <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                <Input value={routeFrom} onChange={(e)=>setRouteFrom(e.target.value)} placeholder="出発地" className="h-11" />
+                                <Input value={routeTo} onChange={(e)=>setRouteTo(e.target.value)} placeholder="到着地" className="h-11" />
+                                <Input value={routeVia} onChange={(e)=>setRouteVia(e.target.value)} placeholder="経由地（任意）" className="h-11" />
+                                <Input value={routeDate} onChange={(e)=>setRouteDate(e.target.value)} type="date" placeholder="日付" className="h-11" />
                               </div>
+                              <div className="flex justify-between items-center gap-3">
+                                <label className="flex items-center gap-2 text-sm">
+                                  <input type="checkbox" checked={deductPass} onChange={(e)=>setDeductPass(e.target.checked)} />
+                                  定期区間を控除する
+                                </label>
+                                <Button onClick={runCalc} className="h-11">運賃検索（ダミー）</Button>
+                              </div>
+                              {calcResult && (
+                                <div className="p-3 bg-slate-100 rounded-lg text-sm">
+                                  <div>{calcResult.summary}</div>
+                                  <div>運賃: {calcResult.fare}円 / 控除後: <span className="font-semibold text-base">{calcResult.after}</span>円</div>
+                                </div>
+                              )}
                             </CardContent>
                           </Card>
                           
-                          {/* 選択した請求書の確認・修正フォーム */}
-                          {selectedInvoice && (
-                            <Card>
-                              <CardHeader className="p-6 pb-2">
-                                <StepTitle 
-                                  step={3} 
-                                  title={`[${selectedInvoice.vendor}] の確認・修正`}
-                                  desc="AIが抽出した内容を確認し、必要に応じて修正してください。" 
-                                />
-                              </CardHeader>
-                              <CardContent className="p-6 pt-2 space-y-3">
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                  <Input placeholder="金額（AI）" value={selectedInvoice.amount || ''} className="h-11" />
-                                  <Input placeholder="日付（AI）" value={selectedInvoice.receivedDate || ''} className="h-11" />
-                                  <select className="h-11 border px-3 text-sm bg-white border-gray-300 rounded-md">
-                                    <option>{selectedInvoice.aiGuess}（AI推奨）</option>
-                                    <option>仕入高</option>
-                                    <option>地代家賃</option>
-                                    <option>広告宣伝費</option>
-                                    <option>消耗品費</option>
-                                  </select>
-                                </div>
-                                <Textarea placeholder="備考・メモ（例：PO-1025紐付け）" />
-                                <div className="flex items-center gap-3">
-                                  <Button className="flex items-center gap-2 h-11"><Send size={18}/> この内容で仕訳登録</Button>
-                                  <Button variant="destructive" className="flex items-center gap-2 h-11"><XCircle size={18}/> この検知は無視</Button>
-                                </div>
-                              </CardContent>
-                            </Card>
-                          )}
+                          {/* 月末まとめ（Excel/CSVライク） */}
+                          <Card>
+                            <CardHeader className="p-6 pb-2">
+                              <StepTitle 
+                                step={3} 
+                                title="交通費精算（月末まとめ）" 
+                                desc="Excelから貼り付け、または直接入力してください。" 
+                              />
+                            </CardHeader>
+                            <CardContent className="p-6 pt-2 space-y-3">
+                              <div className="grid grid-cols-6 gap-2 text-xs font-medium text-muted-foreground px-1">
+                                <div>日付</div><div>出発</div><div>到着</div><div>経由</div><div>運賃</div><div>備考</div>
+                              </div>
+                              <div className="space-y-2">
+                                {transportRows.map((row, i) => (
+                                  <div key={i} className="grid grid-cols-6 gap-2">
+                                    <Input value={row.date} onChange={(e)=>updateTransport(i,'date',e.target.value)} type="text" placeholder="MM/DD" />
+                                    <Input value={row.from} onChange={(e)=>updateTransport(i,'from',e.target.value)} placeholder="出発" />
+                                    <Input value={row.to} onChange={(e)=>updateTransport(i,'to',e.target.value)} placeholder="到着" />
+                                    <Input value={row.via} onChange={(e)=>updateTransport(i,'via',e.target.value)} placeholder="経由" />
+                                    <Input value={row.fare} onChange={(e)=>updateTransport(i,'fare',e.target.value)} type="number" placeholder="運賃" />
+                                    <Input value={row.note} onChange={(e)=>updateTransport(i,'note',e.target.value)} placeholder="備考" />
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="flex justify-between items-center gap-3 pt-2">
+                                <Button variant="outline" onClick={pasteExampleRows} className="h-11">サンプル貼り付け</Button>
+                                <Button className="flex items-center gap-2 h-11"><Send size={18}/> まとめて申請を送信</Button>
+                              </div>
+                            </CardContent>
+                          </Card>
                         </>
+                      )}
+
+                      {/* ===== 追加: 出張申請（詳細フォーム） ===== */}
+                      {selectedType === '出張申請' && (
+                        <Card>
+                          <CardHeader className="p-6 pb-2">
+                            {/* 稟議・購買はアップロードがあるので Step 3 になる */}
+                            <StepTitle 
+                              step={(selectedType === '稟議・購買') ? 3 : 2} 
+                              title="出張申請（事前）" 
+                              desc="出張の目的、期間、概算費用を入力してください。" 
+                            />
+                          </CardHeader>
+                          <CardContent className="p-6 pt-2 space-y-3">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              <Input placeholder="出張先（国・都市）" className="h-11" />
+                              <Input placeholder="訪問先（企業名・イベント名）" className="h-11" />
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                              {/* ===== 修正: type="date" を使い、カレンダーピッカーを表示 ===== */}
+                              <div className="flex flex-col gap-1">
+                                <label className="text-xs text-slate-500 pl-1">開始日</label>
+                                <Input type="date" placeholder="開始日" className="h-11" />
+                              </div>
+                              <div className="flex flex-col gap-1">
+                                <label className="text-xs text-slate-500 pl-1">終了日</label>
+                                <Input type="date" placeholder="終了日" className="h-11" />
+                              </div>
+                            </div>
+                            <Textarea placeholder="出張目的・背景（具体的に）" />
+                            <div className="border-t pt-3 space-y-3">
+                              <div className="text-sm font-semibold">概算費用</div>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                <Input type="number" placeholder="航空券・交通費" className="h-11" />
+                                <Input type="number" placeholder="宿泊費" className="h-11" />
+                                <Input type="number" placeholder="日当" className="h-11" />
+                                <Input type="number" placeholder="その他（交際費等）" className="h-11" />
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3 pt-2">
+                              <Button className="flex items-center gap-2 h-11"><Send size={18}/> 事前申請を送信</Button>
+                            </div>
+                          </CardContent>
+                        </Card>
                       )}
 
                       {/* === 交通費精算（ウィザードのみ） === */}
@@ -685,12 +761,18 @@ export default function App() {
                       {/* ===== 修正: 「請求書」 -> 「請求書発行（販売側）」 ===== */}
                       {/* ===== 修正: 「請求書発行」に変更 ===== */}
                       {/* ===== 修正: 「仕入請求書」以外の場合に汎用フォーム（ステップ3）を表示するよう修正 ===== */}
-                      {(selectedType !== '仕入請求書') && (
+                      {/* ===== 修正: 「出張申請」「交通費精算」も除外 ===== */}
+                      {(selectedType !== '仕入請求書' && selectedType !== '出張申請' && selectedType !== '交通費精算') && (
                         // ===== 修正: Cardコンポーネント側で shadow, rounded 対応 =====
                         <Card>
                           {/* ===== 修正: Step 2 -> 3 に変更（発行側はファイルアップがStep 2のため） ===== */}
                           {/* ===== 修正: ステップ番号を動的に変更（アップロードがない業務はStep 2） ===== */}
-                          <CardHeader className="p-6 pb-2"><StepTitle step={(selectedType === '請求書発行' || selectedType === '経費精算' || selectedType === '出張旅費精算' || selectedType === '稟議・購買') ? 3 : 2} title="AI転記結果の確認・修正" desc="AIが抽出した内容を確認し、必要に応じて修正してください。" /></CardHeader>
+                          {/* ===== 修正: 稟議・購買はアップロードがあるので Step 3 になる ===== */}
+                          <CardHeader className="p-6 pb-2"><StepTitle 
+                            step={(selectedType === '請求書発行' || selectedType === '経費精算' || selectedType === '出張旅費精算' || selectedType === '稟議・購買') ? 3 : 2} 
+                            title="AI転記結果の確認・修正" 
+                            desc="AIが抽出した内容を確認し、必要に応じて修正してください。" 
+                          /></CardHeader>
                           <CardContent className="p-6 pt-2 space-y-3">
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                               {/* ===== 修正: (Input側で対応) ===== */}
